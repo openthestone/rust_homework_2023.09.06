@@ -17,13 +17,25 @@ macro_rules! hash_map {
     };
 }
 
+static mut CNT: i32 = 0;
 struct MyRc<T>(T);
 impl<T> MyRc<T> {
     fn new(x: T) -> MyRc<T> {
+        unsafe {
+            CNT += 1;
+        }
         MyRc(x)
     }
     fn clone(x: &MyRc<T>) -> &MyRc<T> {
+        unsafe {
+            CNT += 1;
+        }
         x
+    }
+    fn strong_count(_x: &MyRc<T>) -> i32 {
+        unsafe {
+            CNT
+        }
     }
 }
 impl<T> Deref for MyRc<T> {
@@ -63,10 +75,10 @@ fn main() {
 
     // MyRc
     let rc1 = MyRc::new(5);
-    println!("rc1: {:?}", *rc1);
+    println!("rc1: {:?}, count: {:?}", *rc1, MyRc::strong_count(&rc1));
     let rc2 = MyRc::clone(&rc1);
     let rc3 = MyRc::clone(rc2);
-    println!("rc1: {:?}, rc2: {:?}, rc3: {:?}", *rc1, **rc2, **rc3);
+    println!("rc1: {:?}, rc2: {:?}, rc3: {:?}, count: {:?}", *rc1, **rc2, **rc3, MyRc::strong_count(&rc1));
 
     // SimpleStack
     let stack = SimpleStack::new();
