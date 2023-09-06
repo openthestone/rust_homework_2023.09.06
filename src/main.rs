@@ -65,7 +65,8 @@ fn main() {
     let rc1 = MyRc::new(5);
     println!("rc1: {:?}", *rc1);
     let rc2 = MyRc::clone(&rc1);
-    println!("rc1: {:?}, rc2: {:?}", *rc1, **rc2);
+    let rc3 = MyRc::clone(rc2);
+    println!("rc1: {:?}, rc2: {:?}, rc3: {:?}", *rc1, **rc2, **rc3);
 
     // SimpleStack
     let stack = SimpleStack::new();
