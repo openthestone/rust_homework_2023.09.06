@@ -2,9 +2,11 @@
 extern crate std;
 
 use std::collections::HashMap;
+use std::alloc::*;
 use std::ops::Deref;
 use std::cell::RefCell;
 
+// HashMap
 macro_rules! hash_map {
     ($($key:expr => $val:expr),*) => {
         {
@@ -17,34 +19,57 @@ macro_rules! hash_map {
     };
 }
 
-static mut CNT: i32 = 0;
-struct MyRc<T>(T);
+// MyRc
+struct RefCnt<T> {
+    count: i32,
+    object: T
+}
+impl<T> RefCnt<T> {
+    fn new(x: T) -> RefCnt<T> {
+        RefCnt { count: 1, object: x }
+    }
+    fn change(&mut self, plus: i32) {
+        self.count += plus;
+    }
+    fn strong_count(&self) -> i32 { self.count }
+}
+struct MyRc<T> {
+    refcount: *mut RefCnt<T>,
+}
 impl<T> MyRc<T> {
     fn new(x: T) -> MyRc<T> {
         unsafe {
-            CNT += 1;
+            let lt = Layout::new::<RefCnt<T>>();
+            let tmp = alloc(lt);
+            if tmp.is_null() {
+                handle_alloc_error(lt);
+            }
+            *(tmp as *mut RefCnt<T>) = RefCnt::new(x);
+            MyRc{ refcount: tmp as *mut RefCnt<T> }
         }
-        MyRc(x)
     }
-    fn clone(x: &MyRc<T>) -> &MyRc<T> {
+    fn clone(&self) -> MyRc<T> {
         unsafe {
-            CNT += 1;
+            (*(self.refcount as *mut RefCnt<T>)).change(1);
+            MyRc { refcount: self.refcount as *mut RefCnt<T> }
         }
-        x
     }
-    fn strong_count(_x: &MyRc<T>) -> i32 {
+    fn strong_count(&self) -> i32 {
         unsafe {
-            CNT
+            (*(self.refcount as *mut RefCnt<T>)).strong_count()
         }
     }
 }
 impl<T> Deref for MyRc<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
-        &self.0
+        unsafe {
+            &(*(self.refcount as *mut RefCnt<T>)).object
+        }
     }
 }
 
+// SimpleStack
 #[derive(Debug)]
 struct SimpleStack<T> {
     stack: RefCell<Vec<T>>,
@@ -77,8 +102,8 @@ fn main() {
     let rc1 = MyRc::new(5);
     println!("rc1: {:?}, count: {:?}", *rc1, MyRc::strong_count(&rc1));
     let rc2 = MyRc::clone(&rc1);
-    let rc3 = MyRc::clone(rc2);
-    println!("rc1: {:?}, rc2: {:?}, rc3: {:?}, count: {:?}", *rc1, **rc2, **rc3, MyRc::strong_count(&rc1));
+    let rc3 = MyRc::clone(&rc2);
+    println!("rc1: {:?}, rc2: {:?}, rc3: {:?}, count: {:?}", *rc1, *rc2, *rc3, MyRc::strong_count(&rc1));
 
     // SimpleStack
     let stack = SimpleStack::new();
